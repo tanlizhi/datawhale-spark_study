@@ -246,7 +246,9 @@ Spark可运行于YARN之上，与Hadoop进行统一部署，即“Spark on YARN�
 
 ### 在jupyter notebook上实现wordCount
 
-![1565225865565](C:\Users\cloud\AppData\Roaming\Typora\typora-user-images\1565225865565.png)
+![1565314325036](C:\Users\cloud\AppData\Roaming\Typora\typora-user-images\1565314325036.png)
+
+
 
 ### 问题回答
 
