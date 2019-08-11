@@ -206,3 +206,101 @@ PythonRDD[49] at RDD at PythonRDD.scala:48
 >>> pairRDD1.join(pairRDD2).foreach(print)
 ```
 
+## 共享变量
+
+在默认情况下，当Spark在集群的多个不同节点的多个任务上并行运行一个函数时，它会把函数中涉及到的每个变量，在每个任务上都生成一个副本。但是，有时候，需要在多个任务之间共享变量，或者在任务（Task）和任务控制节点（Driver Program）之间共享变量。为了满足这种需求，Spark提供了两种类型的变量：广播变量（broadcast variables）和累加器（accumulators）。广播变量用来把变量在所有节点的内存之间进行共享。累加器则支持在所有不同节点之间进行累加计算（比如计数或者求和）。
+
+### 广播变量
+
+广播变量（broadcast variables）允许程序开发人员在每个机器上缓存一个只读的变量，而不是为机器上的每个任务都生成一个副本。通过这种方式，就可以非常高效地给每个节点（机器）提供一个大的输入数据集的副本。Spark的“actioin”操作会跨越多个阶段（stage），对于每个阶段内的所有任务所需要的公共数据，Spark都会自动进行广播。通过广播方式进行传播的变量，会经过序列化，然后在被任务使用时再进行反序列化。这就意味着，显式地创建广播变量只有在下面的情形中是有用的：当跨越多个阶段的那些任务需要相同的数据，或者当以反序列化方式对数据进行缓存是非常重要的。
+
+可以通过调用SparkContext.broadcast(v)来从一个普通变量v中创建一个广播变量。这个广播变量就是对普通变量v的一个包装器，通过调用value方法就可以获得这个广播变量的值，具体代码如下:
+
+```python
+>>> broadcastVar = sc.broadcast([1, 2, 3])
+>>> broadcastVar.value
+[1,2,3]
+```
+
+这个广播变量被创建以后，那么在集群中的任何函数中，都应该使用广播变量broadcastVar的值，而不是使用v的值，这样就不会把v重复分发到这些节点上。此外，一旦广播变量创建后，普通变量v的值就不能再发生修改，从而确保所有节点都获得这个广播变量的相同的值。
+
+### 累加器
+
+累加器是仅仅被相关操作累加的变量，通常可以被用来实现计数器（counter）和求和（sum）。Spark原生地支持数值型（numeric）的累加器，程序开发人员可以编写对新类型的支持。如果创建累加器时指定了名字，则可以在Spark UI界面看到，这有利于理解每个执行阶段的进程。
+
+一个数值型的累加器，可以通过调用SparkContext.accumulator()来创建。运行在集群中的任务，就可以使用add方法来把数值累加到累加器上，但是，这些任务只能做累加操作，不能读取累加器的值，只有任务控制节点（Driver Program）可以使用value方法来读取累加器的值。
+下面是一个代码实例，演示了使用累加器来对一个数组中的元素进行求和：
+
+```python
+>>> accum = sc.accumulator(0)
+>>> sc.parallelize([1, 2, 3, 4]).foreach(lambda x : accum.add(x))
+>>> accum.value
+10
+```
+
+## 文件数据读写
+
+### 文件系统的数据读写
+
+除了可以对本地文件系统进行读写以外，Spark还支持很多其他常见的文件格式（如文本文件、JSON、SequenceFile等）和文件系统（如HDFS、Amazon S3等）和数据库（如MySQL、HBase、Hive等）。数据库的读写我们将在Spark SQL部分介绍，因此，这里只介绍文件系统的读写和不同文件格式的读写。
+
+#### 本地文件系统的数据读写
+
+```python
+>>> textFile = sc.textFile("file:///usr/local/spark/mycode/wordcount/word.txt")   # 读取本地文件
+>>> textFile.first()   # 显示第一行
+>>> textFile.saveAsTextFile("file:///usr/local/spark/mycode/wordcount/writeback.txt")   # 保存，保存的是个文件夹里面的part-0000和word.txt内容一样，读取这个文件夹的时候自动识别part-0000这个文件
+```
+
+#### 分布式文件系统HDFS的数据读写
+
+```python
+>>> val textFile = sc.textFile("hdfs://localhost:9000/user/hadoop/word.txt")
+>>> textFile.first()
+
+```
+
+```python
+# 对于HDFS系统，以下三条命令完全一样
+>>> val textFile = sc.textFile("hdfs://localhost:9000/user/hadoop/word.txt")
+>>> val textFile = sc.textFile("/user/hadoop/word.txt")
+>>> val textFile = sc.textFile("word.txt")
+```
+
+### 不同文件格式的读写
+
+#### 文本文件
+
+实际上，我们在上面演示的都是文本文件的读写，因此，这里不再赘述，只是简单再总结一下。
+把本地文件系统中的文本文件加载到RDD中的语句如下：
+
+```python
+>>> rdd = sc.textFile("file:///usr/local/spark/mycode/wordcount/word.txt")
+```
+
+当我们给textFile()函数传递一个“包含完整路径的文件名”时，就会把这个文件加载到RDD中。如果我们给textFile()函数传递的不是文件名，而是一个目录，则该目录下的所有文件内容都会被读取到RDD中。
+
+关于把RDD中的数据保存到文本文件，可以采用如下语句：
+
+```python
+>>> rdd.saveAsTextFile("file:///usr/local/spark/mycode/wordcount/outputFile")
+```
+
+正像上面我们已经介绍的那样，我们在saveAsTextFile()函数的参数中给出的是目录，不是文件名，RDD中的数据会被保存到给定的目录下。
+
+#### JSON
+
+```json
+{"name":"Michael"}
+{"name":"Andy", "age":30}
+{"name":"Justin", "age":19}
+```
+
+```python
+>>> jsonStr = sc.textFile("file:///usr/local/spark/examples/src/main/resources/people.json")
+>>> jsonStr.foreach(print)
+{"name":"Michael"}
+{"name":"Andy", "age":30}
+{"name":"Justin", "age":19}
+```
+
