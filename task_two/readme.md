@@ -20,5 +20,8 @@
 
 
 
+pat_sort.ipynb:pat sort问题的代码
 
-  
+pat_sort.txt:pat sort的示例数据
+
+task_two.pdf:一些笔记
