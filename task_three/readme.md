@@ -25,3 +25,9 @@
 [5.3.1 DStream操作概述](http://dblab.xmu.edu.cn/blog/1737-2/)
 
 问题扩展：请简述下spark sql的运行机制。
+
+
+
+#### 遇到问题，jupyter notebook环境下使用pyspark加载mysql的JDBC驱动的问题
+
+只需要将mysql的驱动包放在%SPARK_HOME%/jars/目录下即可
